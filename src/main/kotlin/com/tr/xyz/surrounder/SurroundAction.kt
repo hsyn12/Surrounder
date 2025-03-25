@@ -19,8 +19,8 @@ abstract class BaseSurroundAction : AnAction() {
         val editor = e.getData(CommonDataKeys.EDITOR)
 
         e.presentation.isEnabled = project != null &&
-                editor != null &&
-                editor.selectionModel.hasSelection()
+                editor != null /*&&
+                editor.selectionModel.hasSelection()*/
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -29,14 +29,29 @@ abstract class BaseSurroundAction : AnAction() {
         val document = editor.document
         val selectionModel = editor.selectionModel
 
-        val selectedText = selectionModel.selectedText ?: return
+        val selectedText = selectionModel.selectedText
         val start = selectionModel.selectionStart
         val end = selectionModel.selectionEnd
 
-        WriteCommandAction.runWriteCommandAction(project) {
-            val newText = "${getPrefix()}$selectedText${getSuffix()}"
-            document.replaceString(start, end, newText)
-            selectionModel.setSelection(start, start + newText.length)
+        // if there is a selection, surround it
+        if (selectedText != null && selectedText.isNotBlank())
+            WriteCommandAction.runWriteCommandAction(project) {
+                val newText = "${getPrefix()}$selectedText${getSuffix()}"
+                document.replaceString(start, end, newText)
+                selectionModel.setSelection(
+                    start + getPrefix().length,
+                    start + newText.length - getSuffix().length
+                )
+                editor.caretModel.moveToOffset(start + getPrefix().length)
+            }
+        else {
+            val _start = editor.caretModel.offset
+            val newText = "${getPrefix()}${getSuffix()}"
+            WriteCommandAction.runWriteCommandAction(project) {
+                document.insertString(_start, newText)
+                editor.caretModel.moveToOffset(_start + getPrefix().length)
+            }
+
         }
     }
 
